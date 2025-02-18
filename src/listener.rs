@@ -1,45 +1,55 @@
-use redis::AsyncCommands;
-use redis::aio::{MultiplexedConnection, PubSub};
+// use redis::PubSub;
+use redis::aio::PubSub;
 use tokio::sync::mpsc;
 use tokio::time::{self, Duration};
+// use futures_util::stream::stream::StreamExt;
+use tokio_stream::StreamExt;
 
-/// Creates a Pub/Sub connection and listens to multiple Redis channels
+// pub struct RedisListener {
+//     pubsub: PubSub<'static>
+// }
+
+// impl RedisListener {
+//     pub async fn new(client: &Client) -> redis::RedisResult<Self> {
+//         let mut conn: Connection = client.get_async_connection().await?;
+//         let pubsub = conn.as_pubsub(); // Borrowing connection
+//         Ok(Self { pubsub })
+//     }
+// }
+
+/// Listens to Redis Pub/Sub channels and forwards messages to the processor.
 pub async fn listen_to_channels(
-    redis_url: &str,
-    channels: Vec<String>,
+    mut pubsub: PubSub,
     tx: mpsc::Sender<(String, String)>,
 ) -> redis::RedisResult<()> {
-    // Create a Redis client
-    let client = redis::Client::open(redis_url)?;
-    
-    // Get a multiplexed connection
-    let mut conn: MultiplexedConnection = client.get_multiplexed_async_connection().await?;
+    // loop {
+    //     match pubsub.on_message() {
+    //         Ok(msg) => {
+    //             let channel = msg.get_channel_name().to_string();
+    //             let payload: String = msg.get_payload()?;
+    //             println!("Received: '{}' on {}", payload, channel);
 
-    // Create a PubSub instance from the multiplexed connection
-    let mut pubsub = conn.pubsub();
+    //             if tx.send((channel, payload)).await.is_err() {
+    //                 eprintln!("Failed to send message to processor");
+    //             }
+    //         }
+    //         Err(e) => {
+    //             eprintln!("Error in Pub/Sub: {:?}", e);
+    //             time::sleep(Duration::from_secs(1)).await;
+    //         }
+    //     }
+    // }
+    let mut message_stream = pubsub.on_message();
 
-    // Subscribe to all channels
-    for channel in &channels {
-        pubsub.subscribe(channel).await?;
-        println!("Subscribed to {}", channel);
-    }
+    while let Some(msg) = message_stream.next().await {
+        let channel = msg.get_channel_name().to_string();
+        let payload: String = msg.get_payload()?;
+        println!("Received: '{}' on {}", payload, channel);
 
-    // Listen for messages
-    loop {
-        match pubsub.on_message().await {
-            Ok(msg) => {
-                let channel = msg.get_channel_name().to_string();
-                let payload: String = msg.get_payload()?;
-                println!("Received: '{}' on {}", payload, channel);
-
-                if tx.send((channel, payload)).await.is_err() {
-                    eprintln!("Failed to send message to processor");
-                }
-            }
-            Err(e) => {
-                eprintln!("Error in Pub/Sub: {:?}", e);
-                time::sleep(Duration::from_secs(1)).await;
-            }
+        if tx.send((channel, payload)).await.is_err() {
+            eprintln!("Failed to send message to processor");
         }
     }
+
+    Ok(())
 }
