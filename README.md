@@ -12,7 +12,7 @@ On another terminal execute the following commands:
 ```
 - redis-cli publish inputA "hello"
 - redis-cli publish inputB "world"
-- redis-cli publish inputC "rust"
+- redis-cli publish inputC "real-time aggregator"
 ```
 
 Take a look at the application server and the logs should look something similar to below:
@@ -26,3 +26,8 @@ Aggregated Result: inputB: 1, inputA: 1, inputC: 1
 Received: 'rust' on inputC
 Aggregated Result: inputB: 1, inputA: 1, inputC: 2
 ```
+
+#### To run the tests
+Execute the following command:
+`cargo test -- --nocapture
+

@@ -21,11 +21,8 @@ async fn main() -> redis::RedisResult<()> {
     let input_channels = config.input_channels.clone();
     let output_channel = config.output_channel.clone();
 
-    // Create a separate connection for PubSub
-    // let mut pubsub = client.get_async_connection().await?.into_pubsub();
     let mut pubsub = client.get_async_pubsub().await?;
     // Create a PubSub connection
-    // let mut pubsub = conn.into_pubsub();
     for channel in &input_channels {
         pubsub.subscribe(channel).await?;
     }
